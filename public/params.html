@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Parameters</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { background-color: #00FF00; font-family: 'Verdana', sans-serif; margin: 0; padding: 20px; }
+        .box { width: 350px; background: rgba(0,0,0,0.85); border: 2px solid #00BFFF; border-radius: 5px; padding: 15px; color: white; }
+        h1 { margin: 0 0 10px 0; text-align: center; color: #00BFFF; font-size: 1.2em; text-transform: uppercase; }
+        .row { display: flex; justify-content: space-between; font-size: 1.1em; margin-bottom: 5px; padding: 5px; background: rgba(255,255,255,0.05); }
+        .stock { font-weight: bold; color: yellow; }
+        .param { color: white; font-size: 0.9em; }
+        .mult { color: #aaa; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>Active Effects</h1>
+        <div id="list">Waiting for stocks...</div>
+    </div>
+
+    <script>
+        const socket = io();
+        const BASE_PRICE = 50.0;
+
+        socket.on('update', (data) => {
+            const list = document.getElementById('list');
+            if(data.stocks.length === 0) {
+                list.innerHTML = "No stocks active.";
+                return;
+            }
+
+            list.innerHTML = data.stocks.map(s => {
+                const mult = (s.value / BASE_PRICE).toFixed(2);
+                return `
+                <div class="row">
+                    <span class="stock">${s.name}</span>
+                    <span class="param">${s.paramType} <span class="mult">(${mult}x)</span></span>
+                </div>
+            `;
+            }).join('');
+        });
+    </script>
+</body>
+</html>

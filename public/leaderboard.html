@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Leaderboard</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { background-color: #00FF00; font-family: 'Arial', sans-serif; margin: 0; padding: 20px; }
+        .box { width: 400px; background: rgba(0,0,0,0.9); border: 2px solid gold; border-radius: 10px; padding: 15px; color: white; }
+        h1 { margin: 0 0 15px 0; text-align: center; color: gold; border-bottom: 1px solid #555; padding-bottom: 10px; }
+        .row { display: flex; justify-content: space-between; font-size: 1.2em; margin-bottom: 8px; padding: 5px; border-bottom: 1px solid #333; }
+        .row:first-child { font-size: 1.4em; font-weight: bold; color: #fff; }
+        .rank { width: 30px; color: #888; }
+        .money { color: #4caf50; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>FORBES LIST</h1>
+        <div id="list"></div>
+    </div>
+
+    <script>
+        const socket = io();
+        socket.on('update', (data) => {
+            const list = document.getElementById('list');
+            list.innerHTML = data.leaderboard.map((u, i) => `
+                <div class="row">
+                    <span><span class="rank">#${i+1}</span> ${u.name}</span>
+                    <span class="money">$${u.worth.toLocaleString()}</span>
+                </div>
+            `).join('');
+        });
+    </script>
+</body>
+</html>

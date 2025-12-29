@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Los Santos Exchange</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { background-color: #121212; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 10px; }
+        .header { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #333; }
+        .balance { font-size: 24px; color: #4caf50; font-weight: bold; }
+        .stock-list { display: flex; flex-direction: column; gap: 10px; }
+        .stock-card { background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #333; display: flex; flex-direction: column; }
+        .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .stock-name { font-weight: bold; font-size: 18px; }
+        .stock-price { color: #4caf50; font-weight: bold; }
+        .stock-param { font-size: 12px; color: #888; }
+        .actions { display: flex; gap: 10px; margin-top: 10px; }
+        button { flex: 1; padding: 10px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; color: white; }
+        .btn-buy { background: #4caf50; }
+        .btn-sell { background: #f44336; }
+        .owned { font-size: 12px; color: #aaa; }
+        input[type=number] { width: 50px; padding: 5px; border-radius: 4px; border: 1px solid #555; background: #222; color: white; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>CURRENT BALANCE</div>
+        <div class="balance" id="playerMoney">$0</div>
+    </div>
+
+    <div class="stock-list" id="stockList">
+        <!-- Stocks go here -->
+    </div>
+
+    <script>
+        const socket = io();
+        let myMoney = 0;
+
+        socket.on('update', (data) => {
+            myMoney = data.playerBalance;
+            document.getElementById('playerMoney').innerText = `$${myMoney.toLocaleString()}`;
+            renderStocks(data.stocks);
+        });
+
+        function renderStocks(stocks) {
+            const list = document.getElementById('stockList');
+            list.innerHTML = '';
+
+            if (stocks.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color:#555;">No stocks listed yet. Waiting for Twitch Chat...</div>';
+                return;
+            }
+
+            stocks.forEach(stock => {
+                const card = document.createElement('div');
+                card.className = 'stock-card';
+                // Round up buy price for player visual clarity
+                const buyPrice = Math.ceil(stock.value);
+                
+                card.innerHTML = `
+                    <div class="row">
+                        <span class="stock-name">${stock.name}</span>
+                        <span class="stock-price">$${buyPrice}</span>
+                    </div>
+                    <div class="row">
+                        <span class="stock-param">${stock.paramType}</span>
+                        <span class="owned">Owned: ${stock.playerShares}</span>
+                    </div>
+                    <div class="actions">
+                        <input type="number" id="amt-${stock.name}" value="1" min="1">
+                        <button class="btn-buy" onclick="trade('${stock.name}', 'buy')">BUY</button>
+                        <button class="btn-sell" onclick="trade('${stock.name}', 'sell')">SELL</button>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        async function trade(name, type) {
+            const amount = document.getElementById(`amt-${name}`).value;
+            const res = await fetch('/api/phone/trade', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stockName: name, amount: amount, type: type })
+            });
+            const result = await res.json();
+            if (!result.success) alert(result.msg);
+        }
+    </script>
+</body>
+</html>
