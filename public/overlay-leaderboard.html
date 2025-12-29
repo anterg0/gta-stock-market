@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Leaderboard</title>
+    <style>
+        body {
+            background: #00ff00; /* Green screen */
+            margin: 0;
+            padding: 15px;
+            font-family: 'Arial Black', 'Arial', sans-serif;
+            color: white;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .title {
+            font-size: 2em;
+            color: #00ff00;
+            text-shadow: 3px 3px 0 #003300;
+            margin: 0;
+        }
+        
+        .subtitle {
+            color: #88ff88;
+            margin-top: 5px;
+        }
+        
+        .leaderboard {
+            background: rgba(0, 40, 0, 0.9);
+            border-radius: 10px;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            border: 4px solid #00cc00;
+        }
+        
+        .leaderboard-header {
+            display: grid;
+            grid-template-columns: 1fr 2fr 2fr;
+            background: #005500;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .player-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr 2fr;
+            padding: 12px 10px;
+            margin-bottom: 8px;
+            background: rgba(0, 80, 0, 0.6);
+            border-radius: 5px;
+            transition: transform 0.2s;
+        }
+        
+        .player-row:hover {
+            transform: scale(1.02);
+            background: rgba(0, 100, 0, 0.7);
+        }
+        
+        .player-row.top-1 {
+            background: linear-gradient(90deg, rgba(255,215,0,0.3), rgba(0,80,0,0.6));
+            border: 2px solid gold;
+        }
+        
+        .player-row.top-2 {
+            background: linear-gradient(90deg, rgba(192,192,192,0.3), rgba(0,80,0,0.6));
+            border: 2px solid silver;
+        }
+        
+        .player-row.top-3 {
+            background: linear-gradient(90deg, rgba(205,127,50,0.3), rgba(0,80,0,0.6));
+            border: 2px solid #CD7F32;
+        }
+        
+        .rank {
+            font-size: 1.3em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .player-name {
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+        }
+        
+        .player-worth {
+            font-size: 1.2em;
+            color: #00ff00;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            font-weight: bold;
+        }
+        
+        .player-stocks {
+            font-size: 0.8em;
+            color: #aaffaa;
+            grid-column: 1 / -1;
+            margin-top: 5px;
+            padding-top: 5px;
+            border-top: 1px solid #005500;
+        }
+        
+        .crown {
+            color: gold;
+            margin-right: 5px;
+        }
+        
+        .player-badge {
+            display: inline-block;
+            background: #00aa00;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            margin-left: 8px;
+        }
+        
+        .player-badge.player {
+            background: #0066cc;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 class="title">🏆 STOCK KINGS</h1>
+        <div class="subtitle">Top Shareholders by Total Worth</div>
+    </div>
+    
+    <div class="leaderboard">
+        <div class="leaderboard-header">
+            <div>RANK</div>
+            <div>PLAYER</div>
+            <div style="text-align: right;">TOTAL WORTH</div>
+        </div>
+        <div id="leaderboardRows"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let leaderboard = [];
+        let stocks = {};
+        
+        socket.on('initial_state', (data) => {
+            stocks = data.stocks;
+            updateLeaderboardFromPortfolios(data.playerPortfolio);
+        });
+        
+        socket.on('leaderboard_update', (data) => {
+            leaderboard = data;
+            renderLeaderboard();
+        });
+        
+        function updateLeaderboardFromPortfolios(playerPortfolio) {
+            // In a full implementation, you would fetch all portfolios from server
+            // This is a simplified version
+            const playerWorth = calculatePlayerWorth(playerPortfolio);
+            leaderboard = [
+                { user: "Player", totalWorth: playerWorth, isPlayer: true },
+                { user: "TopTwitcher", totalWorth: 8500 },
+                { user: "StockMaster", totalWorth: 7200 },
+                { user: "GravityKing", totalWorth: 6800 },
+                { user: "SpeedDemon", totalWorth: 5500 },
+                { user: "RainMaker", totalWorth: 4200 },
+                { user: "TraderJoe", totalWorth: 3800 },
+                { user: "MarketWiz", totalWorth: 3200 },
+                { user: "ShareHolder", totalWorth: 2800 },
+                { user: "NewTrader", totalWorth: 1500 }
+            ].sort((a, b) => b.totalWorth - a.totalWorth);
+            
+            renderLeaderboard();
+        }
+        
+        function calculatePlayerWorth(portfolio) {
+            let stockWorth = 0;
+            for (const [symbol, shares] of Object.entries(portfolio.stocks || {})) {
+                const stock = stocks[symbol];
+                if (stock) {
+                    stockWorth += stock.price * shares;
+                }
+            }
+            return portfolio.cash + stockWorth;
+        }
+        
+        function renderLeaderboard() {
+            const container = document.getElementById('leaderboardRows');
+            
+            container.innerHTML = leaderboard.map((player, index) => {
+                const rank = index + 1;
+                const rankClass = `top-${rank}`;
+                const crown = rank === 1 ? '<span class="crown">👑</span>' : '';
+                const badge = player.isPlayer ? '<span class="player-badge player">PLAYER</span>' : '';
+                
+                return `
+                    <div class="player-row ${rank <= 3 ? rankClass : ''}">
+                        <div class="rank">${rank}</div>
+                        <div class="player-name">
+                            ${crown}${player.user}${badge}
+                        </div>
+                        <div class="player-worth">$${player.totalWorth.toLocaleString()}</div>
+                        ${getPlayerStocksHTML(player.user)}
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function getPlayerStocksHTML(username) {
+            // This would fetch actual stock holdings from server
+            // For now, return placeholder
+            if (username === "Player") {
+                return '<div class="player-stocks">GRAVITY: 5 | NPCLIFE: 3 | SPEED: 2</div>';
+            }
+            return '<div class="player-stocks">Active trader</div>';
+        }
+        
+        // Auto-refresh leaderboard every 3 seconds
+        setInterval(() => {
+            fetch('/api/leaderboard')
+                .then(r => r.json())
+                .then(data => {
+                    leaderboard = data;
+                    renderLeaderboard();
+                });
+        }, 3000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stock Details</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background: #00ff00; /* Green screen */
+            margin: 0;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            color: white;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 10px;
+        }
+        
+        .stock-card {
+            background: rgba(0, 30, 0, 0.9);
+            border-radius: 8px;
+            padding: 12px;
+            border: 2px solid #00cc00;
+        }
+        
+        .stock-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .stock-symbol {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #00ff00;
+        }
+        
+        .stock-price {
+            font-size: 1.3em;
+            background: #003300;
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        
+        .stock-name {
+            color: #88ff88;
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+        
+        .stock-info {
+            font-size: 0.8em;
+            color: #aaffaa;
+            margin: 8px 0;
+        }
+        
+        .chart-container {
+            height: 80px;
+            margin-top: 10px;
+        }
+        
+        .price-up { color: #00ff00; }
+        .price-down { color: #ff3333; }
+        
+        .param-badge {
+            display: inline-block;
+            background: #005500;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="stocksContainer">
+        <!-- Stocks will be dynamically inserted here -->
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let stocks = {};
+        let charts = {};
+        
+        socket.on('initial_state', (data) => {
+            stocks = data.stocks;
+            renderStocks();
+        });
+        
+        socket.on('market_update', (data) => {
+            if (stocks[data.symbol]) {
+                stocks[data.symbol].price = data.price;
+                stocks[data.symbol].topHolder = data.topHolder;
+                stocks[data.symbol].history.push(data.price);
+                if (stocks[data.symbol].history.length > 10) {
+                    stocks[data.symbol].history.shift();
+                }
+                updateStockCard(data.symbol);
+            }
+        });
+        
+        function renderStocks() {
+            const container = document.getElementById('stocksContainer');
+            const sortedStocks = Object.entries(stocks)
+                .sort(([,a], [,b]) => b.price - a.price)
+                .map(([symbol, data]) => ({ symbol, ...data }));
+            
+            container.innerHTML = sortedStocks.map(stock => createStockCard(stock)).join('');
+            
+            // Initialize charts
+            sortedStocks.forEach(stock => {
+                initChart(stock.symbol, stock.history);
+            });
+        }
+        
+        function createStockCard(stock) {
+            const priceChange = stock.history.length > 1 
+                ? stock.price - stock.history[stock.history.length - 2] 
+                : 0;
+            const changeClass = priceChange >= 0 ? 'price-up' : 'price-down';
+            const changeSymbol = priceChange >= 0 ? '↗' : '↘';
+            
+            return `
+                <div class="stock-card" id="card-${stock.symbol}">
+                    <div class="stock-header">
+                        <div class="stock-symbol">${stock.symbol}</div>
+                        <div class="stock-price ${changeClass}">
+                            $${stock.price} ${priceChange !== 0 ? changeSymbol : ''}
+                        </div>
+                    </div>
+                    <div class="stock-name">${stock.name}</div>
+                    <div class="stock-info">
+                        <span class="param-badge">Controls: ${stock.param}</span><br>
+                        Top Holder: ${stock.topHolder || 'None'}<br>
+                        Created by: ${stock.creator || 'System'}
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chart-${stock.symbol}"></canvas>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function initChart(symbol, history) {
+            const ctx = document.getElementById(`chart-${symbol}`).getContext('2d');
+            
+            charts[symbol] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: history.map((_, i) => i),
+                    datasets: [{
+                        data: history,
+                        borderColor: '#00ff00',
+                        backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            });
+        }
+        
+        function updateStockCard(symbol) {
+            const stock = stocks[symbol];
+            if (!stock) return;
+            
+            const priceChange = stock.history.length > 1 
+                ? stock.price - stock.history[stock.history.length - 2] 
+                : 0;
+            const changeClass = priceChange >= 0 ? 'price-up' : 'price-down';
+            const changeSymbol = priceChange >= 0 ? '↗' : '↘';
+            
+            const card = document.getElementById(`card-${symbol}`);
+            card.querySelector('.stock-price').innerHTML = 
+                `$${stock.price} ${priceChange !== 0 ? changeSymbol : ''}`;
+            card.querySelector('.stock-price').className = `stock-price ${changeClass}`;
+            
+            // Update chart
+            if (charts[symbol]) {
+                charts[symbol].data.datasets[0].data = stock.history;
+                charts[symbol].update('none');
+            }
+        }
+        
+        // Auto-refresh fallback
+        setInterval(() => {
+            fetch('/api/stocks')
+                .then(r => r.json())
+                .then(data => {
+                    stocks = data.reduce((acc, stock) => {
+                        acc[stock.symbol] = stock;
+                        return acc;
+                    }, {});
+                    renderStocks();
+                });
+        }, 10000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stock Parameters</title>
+    <style>
+        body {
+            background: #00ff00; /* Green screen */
+            margin: 0;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            color: white;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .title {
+            font-size: 2em;
+            color: #00ff00;
+            text-shadow: 2px 2px 0 #003300;
+            margin: 0;
+        }
+        
+        .subtitle {
+            color: #88ff88;
+            margin-top: 5px;
+        }
+        
+        .parameters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .param-card {
+            background: rgba(0, 40, 0, 0.9);
+            border-radius: 8px;
+            padding: 15px;
+            border: 2px solid #00aa00;
+        }
+        
+        .param-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #005500;
+        }
+        
+        .param-name {
+            font-size: 1.3em;
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        .param-stock {
+            background: #005500;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .param-description {
+            margin: 10px 0;
+            color: #aaffaa;
+            font-size: 0.9em;
+        }
+        
+        .param-details {
+            background: rgba(0, 80, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px dashed #005500;
+        }
+        
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        
+        .detail-label {
+            color: #88ff88;
+        }
+        
+        .detail-value {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        .value-bar {
+            height: 10px;
+            background: #003300;
+            border-radius: 5px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        
+        .value-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00aa00, #00ff00);
+            border-radius: 5px;
+            width: 50%;
+            transition: width 0.5s;
+        }
+        
+        .stock-effect {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0, 100, 0, 0.3);
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+        
+        .effect-example {
+            color: #ffff00;
+            font-style: italic;
+            margin-top: 5px;
+        }
+        
+        .icon {
+            font-size: 1.5em;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 class="title">⚙️ STOCK CONTROLS</h1>
+        <div class="subtitle">Which stocks control which game parameters</div>
+    </div>
+    
+    <div class="parameters-grid" id="parametersGrid">
+        <!-- Parameters will be dynamically inserted here -->
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let stocks = {};
+        let parameters = {};
+        
+        const paramDescriptions = {
+            gravity: "Controls the gravity level in the game world",
+            npcHealth: "Sets the maximum health for all NPC characters",
+            vehicleSpeed: "Multiplies vehicle acceleration and top speed",
+            wantedDifficulty: "Adjusts police response difficulty",
+            rainIntensity: "Controls rainfall intensity and weather effects",
+            snowLevel: "Determines snow accumulation level",
+            tractionLoss: "Affects vehicle tire traction and handling",
+            playerArmor: "Sets the maximum armor capacity for the player",
+            weaponDamage: "Multiplies damage from all weapons",
+            timeScale: "Controls the speed of day/night cycle"
+        };
+        
+        const paramExamples = {
+            gravity: "Low gravity = higher jumps, floaty vehicles",
+            npcHealth: "High health = bullet sponge NPCs",
+            vehicleSpeed: "High multiplier = rocket-fast cars",
+            wantedDifficulty: "High difficulty = instant 5-star wanted level",
+            rainIntensity: "High intensity = torrential downpour, flooding"
+        };
+        
+        socket.on('initial_state', (data) => {
+            stocks = data.stocks;
+            parameters = data.parameters;
+            renderParameters();
+        });
+        
+        socket.on('parameter_update', (data) => {
+            if (parameters[data.parameter]) {
+                parameters[data.parameter].value = data.value;
+                updateParameterCard(data.parameter);
+            }
+        });
+        
+        function renderParameters() {
+            const grid = document.getElementById('parametersGrid');
+            
+            // Group stocks by parameter
+            const stocksByParam = {};
+            Object.values(stocks).forEach(stock => {
+                if (!stocksByParam[stock.param]) {
+                    stocksByParam[stock.param] = [];
+                }
+                stocksByParam[stock.param].push(stock);
+            });
+            
+            // Create cards for each parameter
+            grid.innerHTML = Object.entries(parameters).map(([paramKey, paramData]) => {
+                const controllingStocks = stocksByParam[paramKey] || [];
+                const primaryStock = controllingStocks[0];
+                const icon = getParamIcon(paramKey);
+                
+                const valuePercent = ((paramData.value - paramData.min) / 
+                                    (paramData.max - paramData.min)) * 100;
+                
+                return `
+                    <div class="param-card" id="card-${paramKey}">
+                        <div class="param-header">
+                            <div class="param-name">
+                                <span class="icon">${icon}</span>
+                                ${paramKey.toUpperCase()}
+                            </div>
+                            ${primaryStock ? 
+                                `<div class="param-stock">Controlled by: ${primaryStock.symbol}</div>` : 
+                                `<div class="param-stock" style="background: #550000;">No controller</div>`
+                            }
+                        </div>
+                        
+                        <div class="param-description">
+                            ${paramDescriptions[paramKey] || 'Controls a game parameter'}
+                        </div>
+                        
+                        <div class="value-bar">
+                            <div class="value-fill" id="fill-${paramKey}" 
+                                 style="width: ${valuePercent}%"></div>
+                        </div>
+                        
+                        <div class="param-details">
+                            <div class="detail-row">
+                                <span class="detail-label">Current Value:</span>
+                                <span class="detail-value">${paramData.value.toFixed(2)} ${paramData.unit}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Range:</span>
+                                <span class="detail-value">${paramData.min} - ${paramData.max} ${paramData.unit}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Controlling Stock:</span>
+                                <span class="detail-value">
+                                    ${primaryStock ? primaryStock.symbol : 'None'}
+                                    ${primaryStock ? `($${primaryStock.price})` : ''}
+                                </span>
+                            </div>
+                            ${primaryStock ? `
+                                <div class="detail-row">
+                                    <span class="detail-label">Top Holder:</span>
+                                    <span class="detail-value">${primaryStock.topHolder || 'None'}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                        
+                        ${paramExamples[paramKey] ? `
+                            <div class="stock-effect">
+                                <strong>Game Effect:</strong>
+                                <div class="effect-example">${paramExamples[paramKey]}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function updateParameterCard(paramKey) {
+            const paramData = parameters[paramKey];
+            if (!paramData) return;
+            
+            const valuePercent = ((paramData.value - paramData.min) / 
+                                (paramData.max - paramData.min)) * 100;
+            
+            const fillElement = document.getElementById(`fill-${paramKey}`);
+            if (fillElement) {
+                fillElement.style.width = `${valuePercent}%`;
+            }
+            
+            const card = document.getElementById(`card-${paramKey}`);
+            if (card) {
+                const detailRows = card.querySelectorAll('.detail-row');
+                if (detailRows[0]) {
+                    detailRows[0].querySelector('.detail-value').textContent = 
+                        `${paramData.value.toFixed(2)} ${paramData.unit}`;
+                }
+            }
+        }
+        
+        function getParamIcon(paramKey) {
+            const icons = {
+                gravity: '🌍',
+                npcHealth: '❤️',
+                vehicleSpeed: '🚗',
+                wantedDifficulty: '👮',
+                rainIntensity: '🌧️',
+                snowLevel: '❄️',
+                tractionLoss: '🛞',
+                playerArmor: '🛡️',
+                weaponDamage: '🔫',
+                timeScale: '⏰'
+            };
+            return icons[paramKey] || '⚙️';
+        }
+        
+        // Auto-refresh every 5 seconds
+        setInterval(() => {
+            fetch('/api/parameters')
+                .then(r => r.json())
+                .then(data => {
+                    parameters = data;
+                    renderParameters();
+                });
+        }, 5000);
+    </script>
+</body>
+</html>

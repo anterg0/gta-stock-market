@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GTA Stock Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            --primary: #00aa00;
+            --secondary: #005500;
+            --danger: #aa0000;
+            --dark: #111111;
+            --light: #222222;
+            --text: #ffffff;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--dark);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 10px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: var(--secondary);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .balance-display {
+            font-size: 1.8em;
+            margin: 15px 0;
+            text-align: center;
+        }
+        
+        .balance-amount {
+            color: var(--primary);
+            font-weight: bold;
+        }
+        
+        .section {
+            background: var(--light);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .section-title {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        
+        .stock-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .stock-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .stock-symbol {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: var(--primary);
+        }
+        
+        .stock-price {
+            background: var(--secondary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        
+        .stock-info {
+            font-size: 0.9em;
+            color: #aaaaaa;
+            margin-bottom: 10px;
+        }
+        
+        .trade-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        
+        .btn:active {
+            transform: scale(0.98);
+        }
+        
+        .btn-buy {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-sell {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .portfolio-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .game-param {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            background: rgba(0, 170, 0, 0.1);
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .param-value {
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+            
+            .stock-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+            
+            .trade-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎮 GTA Stock Control</h1>
+        <p>Control the game through stocks</p>
+    </div>
+    
+    <div class="balance-display">
+        Cash: <span id="cashAmount" class="balance-amount">$1000</span>
+        <div style="font-size: 0.8em; margin-top: 5px;">
+            Total Value: <span id="totalValue" class="balance-amount">$1000</span>
+        </div>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">📈 Available Stocks</div>
+        <div id="stocksList"></div>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">💰 Your Portfolio</div>
+        <div id="portfolioList"></div>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">⚙️ Game Parameters</div>
+        <div id="parametersList"></div>
+    </div>
+    
+    <div id="notification" class="notification"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let playerStocks = {};
+        let playerCash = 1000;
+        let availableStocks = [];
+        let gameParameters = {};
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', loadData);
+        socket.on('initial_state', updateAllData);
+        socket.on('market_update', handleMarketUpdate);
+        socket.on('parameter_update', handleParameterUpdate);
+        
+        async function loadData() {
+            try {
+                // Load stocks
+                const stocksRes = await fetch('/api/stocks');
+                availableStocks = await stocksRes.json();
+                
+                // Load player portfolio
+                const portRes = await fetch('/api/portfolio/Player');
+                const portfolio = await portRes.json();
+                playerCash = portfolio.cash;
+                playerStocks = portfolio.stocks || {};
+                
+                // Load parameters
+                const paramRes = await fetch('/api/parameters');
+                gameParameters = await paramRes.json();
+                
+                updateUI();
+            } catch (error) {
+                showNotification('Failed to load data', 'error');
+            }
+        }
+        
+        function updateAllData(data) {
+            availableStocks = Object.values(data.stocks || {});
+            playerCash = data.playerPortfolio.cash;
+            playerStocks = data.playerPortfolio.stocks || {};
+            gameParameters = data.parameters || {};
+            updateUI();
+        }
+        
+        function updateUI() {
+            // Update balance display
+            document.getElementById('cashAmount').textContent = '$' + playerCash;
+            const totalValue = calculateTotalValue();
+            document.getElementById('totalValue').textContent = '$' + totalValue;
+            
+            // Update stocks list
+            const stocksList = document.getElementById('stocksList');
+            stocksList.innerHTML = availableStocks.map(stock => `
+                <div class="stock-item">
+                    <div class="stock-header">
+                        <div class="stock-symbol">${stock.symbol}</div>
+                        <div class="stock-price">$${stock.price}</div>
+                    </div>
+                    <div class="stock-info">
+                        ${stock.name}<br>
+                        Controls: ${stock.param} | Top Holder: ${stock.topHolder || 'None'}
+                    </div>
+                    <div class="trade-buttons">
+                        <button class="btn btn-buy" onclick="tradeStock('${stock.symbol}', 'buy')">
+                            Buy 1 Share
+                        </button>
+                        <button class="btn btn-sell" onclick="tradeStock('${stock.symbol}', 'sell')"
+                                ${(playerStocks[stock.symbol] || 0) <= 0 ? 'disabled' : ''}>
+                            Sell 1 Share
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Update portfolio
+            const portfolioList = document.getElementById('portfolioList');
+            if (Object.keys(playerStocks).length === 0) {
+                portfolioList.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">No stocks owned</div>';
+            } else {
+                portfolioList.innerHTML = Object.entries(playerStocks).map(([symbol, shares]) => `
+                    <div class="portfolio-item">
+                        <div>${symbol}</div>
+                        <div><strong>${shares}</strong> shares ($${getStockPrice(symbol) * shares})</div>
+                    </div>
+                `).join('');
+            }
+            
+            // Update parameters
+            const paramsList = document.getElementById('parametersList');
+            paramsList.innerHTML = Object.entries(gameParameters).map(([key, param]) => `
+                <div class="game-param">
+                    <div>${key}</div>
+                    <div class="param-value">${param.value.toFixed(2)} ${param.unit}</div>
+                </div>
+            `).join('');
+        }
+        
+        async function tradeStock(symbol, action) {
+            if (action === 'sell' && (!playerStocks[symbol] || playerStocks[symbol] <= 0)) {
+                showNotification('You don\'t own this stock', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/trade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user: 'Player',
+                        symbol: symbol,
+                        action: action,
+                        shares: 1
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    playerCash = result.newCash;
+                    playerStocks[symbol] = result.sharesOwned || 0;
+                    if (playerStocks[symbol] <= 0) delete playerStocks[symbol];
+                    
+                    updateUI();
+                    showNotification(`${action === 'buy' ? 'Bought' : 'Sold'} 1 ${symbol} for $${result.newPrice}`, 'success');
+                } else {
+                    showNotification(result.error || 'Trade failed', 'error');
+                }
+            } catch (error) {
+                showNotification('Network error', 'error');
+            }
+        }
+        
+        function handleMarketUpdate(data) {
+            // Update the specific stock's price
+            const stockIndex = availableStocks.findIndex(s => s.symbol === data.symbol);
+            if (stockIndex !== -1) {
+                availableStocks[stockIndex].price = data.price;
+                availableStocks[stockIndex].topHolder = data.topHolder;
+                updateUI();
+            }
+        }
+        
+        function handleParameterUpdate(data) {
+            if (gameParameters[data.parameter]) {
+                gameParameters[data.parameter].value = data.value;
+                updateUI();
+            }
+        }
+        
+        function calculateTotalValue() {
+            let stockValue = 0;
+            for (const [symbol, shares] of Object.entries(playerStocks)) {
+                stockValue += getStockPrice(symbol) * shares;
+            }
+            return playerCash + stockValue;
+        }
+        
+        function getStockPrice(symbol) {
+            const stock = availableStocks.find(s => s.symbol === symbol);
+            return stock ? stock.price : 0;
+        }
+        
+        function showNotification(message, type = 'info') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.style.display = 'block';
+            notification.style.background = type === 'error' ? '#aa0000' : type === 'success' ? '#00aa00' : '#0066aa';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Auto-refresh every 5 seconds
+        setInterval(loadData, 5000);
+    </script>
+</body>
+</html>
