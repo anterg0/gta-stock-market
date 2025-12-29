@@ -7,7 +7,7 @@ const client = new tmi.Client({
     options: { debug: true },
     identity: {
         username: 'anterg0',  // Your account
-        password: 'oauth:u7nb6vsycc4q7dcgsx9sl65dx26gfq' // Get from: https://twitchapps.com/tmi/
+        password: 'oauth:u7nb6vsycc4q7dcgsx9sl65dx26gfq'
     },
     channels: ['anterg0']
 });
@@ -15,38 +15,42 @@ const client = new tmi.Client({
 client.connect();
 
 client.on('message', async (channel, tags, message, self) => {
-    if (self) return;
-    
+    // if (self) return;
+    const portfolio = await axios.get(`http://localhost:3000/api/portfolio/${tags.username}`);
     const args = message.trim().split(' ');
     const command = args[0].toLowerCase();
+    console.log(`Command: ${command}, ARGS: ${args}`);
     
     // !buy STOCK_SYMBOL
-    if (command === '!buy' && args[1]) {
-        const symbol = args[1].toUpperCase();
+    if (command === '!buy' && args.length === 3) {
+        const symbol = args[2].toUpperCase();
+        const shares = args[1];
         const response = await axios.post('http://localhost:3000/api/trade', {
             user: tags.username,
             symbol: symbol,
             action: 'buy',
-            shares: 1
+            shares: shares,
+            currentCash: portfolio.data.cash
         }).catch(err => null);
         
         if (response?.data.success) {
-            client.say(channel, `@${tags.username} bought 1 ${symbol} for $${response.data.newPrice}`);
+            client.say(channel, `@${tags.username} bought 1 ${symbol} for $${response.data.newPrice.toFixed(1)}`);
         }
     }
     
     // !sell STOCK_SYMBOL
-    else if (command === '!sell' && args[1]) {
-        const symbol = args[1].toUpperCase();
+    else if (command === '!sell' && args.length === 3) {
+        const symbol = args[2].toUpperCase();
+        const shares = args[1];
         const response = await axios.post('http://localhost:3000/api/trade', {
             user: tags.username,
             symbol: symbol,
             action: 'sell',
-            shares: 1
+            shares: shares
         }).catch(err => null);
         
         if (response?.data.success) {
-            client.say(channel, `@${tags.username} sold 1 ${symbol} for $${response.data.newPrice}`);
+            client.say(channel, `@${tags.username} sold 1 ${symbol} for $${response.data.newPrice.toFixed(1)}`);
         }
     }
     
@@ -64,7 +68,7 @@ client.on('message', async (channel, tags, message, self) => {
         }).catch(err => null);
         
         if (response?.data.success) {
-            client.say(channel, `@${tags.username} created ${symbol} (controls ${param}) at $${response.data.price}`);
+            client.say(channel, `@${tags.username} created ${symbol} (controls ${param}) at $${response.data.price.toFixed(1)}`);
         }
     }
     

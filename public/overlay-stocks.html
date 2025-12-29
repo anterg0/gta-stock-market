@@ -9,7 +9,7 @@
             margin: 0;
             padding: 10px;
             font-family: 'Courier New', monospace;
-            color: white;
+            color: #ffffff; /* White text */
         }
         
         .container {
@@ -19,10 +19,10 @@
         }
         
         .stock-card {
-            background: rgba(0, 30, 0, 0.9);
+            background: #333333; /* Dark gray */
             border-radius: 8px;
             padding: 12px;
-            border: 2px solid #00cc00;
+            border: 2px solid #aaaaaa; /* Light gray border */
         }
         
         .stock-header {
@@ -35,25 +35,25 @@
         .stock-symbol {
             font-size: 1.5em;
             font-weight: bold;
-            color: #00ff00;
+            color: #ffffff; /* White */
         }
         
         .stock-price {
             font-size: 1.3em;
-            background: #003300;
+            background: #666666; /* Medium gray */
             padding: 5px 10px;
             border-radius: 5px;
         }
         
         .stock-name {
-            color: #88ff88;
+            color: #cccccc; /* Light gray */
             margin: 5px 0;
             font-size: 0.9em;
         }
         
         .stock-info {
             font-size: 0.8em;
-            color: #aaffaa;
+            color: #aaaaaa; /* Light gray */
             margin: 8px 0;
         }
         
@@ -62,12 +62,12 @@
             margin-top: 10px;
         }
         
-        .price-up { color: #00ff00; }
-        .price-down { color: #ff3333; }
+        .price-up { color: #ffff00; } /* Yellow up */
+        .price-down { color: #ff3333; } /* Red down */
         
         .param-badge {
             display: inline-block;
-            background: #005500;
+            background: #666666; /* Medium gray */
             padding: 2px 8px;
             border-radius: 10px;
             font-size: 0.8em;
@@ -129,7 +129,7 @@
                     <div class="stock-header">
                         <div class="stock-symbol">${stock.symbol}</div>
                         <div class="stock-price ${changeClass}">
-                            $${stock.price} ${priceChange !== 0 ? changeSymbol : ''}
+                            $${stock.price.toFixed(1)} ${priceChange !== 0 ? changeSymbol : ''}
                         </div>
                     </div>
                     <div class="stock-name">${stock.name}</div>
@@ -154,8 +154,8 @@
                     labels: history.map((_, i) => i),
                     datasets: [{
                         data: history,
-                        borderColor: '#00ff00',
-                        backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                        borderColor: '#ffffff', /* White line */
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)', /* Semi-transparent white */
                         borderWidth: 2,
                         fill: true,
                         tension: 0.4,
@@ -186,7 +186,7 @@
             
             const card = document.getElementById(`card-${symbol}`);
             card.querySelector('.stock-price').innerHTML = 
-                `$${stock.price} ${priceChange !== 0 ? changeSymbol : ''}`;
+                `$${stock.price.toFixed(1)} ${priceChange !== 0 ? changeSymbol : ''}`;
             card.querySelector('.stock-price').className = `stock-price ${changeClass}`;
             
             // Update chart
