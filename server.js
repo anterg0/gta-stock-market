@@ -31,8 +31,7 @@ let pendingMoneyAdjustment = 0;
 let tradeHistoryLog = []; // Stores text logs for the overlay
 
 const validParams = [
-    'GRAVITY', 'NPC_HEALTH', 'ACCELERATION', 'TRACTION', 
-    'RAIN', 'WANTED', 'ARMOR', 'EXPLOSION_FORCE'
+    'GRAVITY', 'NPC_HEALTH', 'PLAYER_HEALTH', 'TRACTION', 'ACCELERATION', 'WANTED', 'ARMOR'
 ];
 
 // --- ROUTES ---
@@ -224,6 +223,104 @@ app.post('/api/game/sync', (req, res) => {
 
 app.post('/api/phone/trade', (req, res) => {
     res.json(processTrade('Player', req.body.stockName, parseInt(req.body.amount), req.body.type, 'player'));
+});
+
+// ============================================= DEBUG =============================================================
+
+app.get('/debug', (req, res) => res.sendFile(path.join(__dirname, 'public', 'debug.html')));
+
+// Debug API endpoints
+app.post('/api/debug/create', (req, res) => {
+    const { name, param } = req.body;
+    
+    if (!validParams.includes(param.toUpperCase())) {
+        return res.json({ success: false, message: `Invalid parameter. Valid: ${validParams.join(', ')}` });
+    }
+    
+    if (stocks.find(s => s.name === name.toUpperCase() || s.paramType === param.toUpperCase())) {
+        return res.json({ success: false, message: 'Stock name or parameter already exists' });
+    }
+    
+    const startPrice = Math.floor(Math.random() * (50 - 30 + 1) + 30);
+    
+    // Use debug user
+    const debugUser = 'DEBUG_USER';
+    if (!users[debugUser]) users[debugUser] = 100000000;
+    
+    if (users[debugUser] < startPrice) {
+        return res.json({ success: false, message: `Debug user needs $${startPrice} to create stock` });
+    }
+    
+    users[debugUser] -= startPrice;
+    
+    const newStock = {
+        id: Date.now(),
+        name: name.toUpperCase(),
+        paramType: param.toUpperCase(),
+        value: startPrice,
+        creator: debugUser,
+        history: [startPrice],
+        shareholders: { [debugUser]: 1 },
+        playerShares: 0
+    };
+    
+    stocks.push(newStock);
+    addLog(`DEBUG: ${name.toUpperCase()} created by debug user for $${startPrice}`);
+    io.emit('update', getData());
+    
+    res.json({ 
+        success: true, 
+        message: `Stock ${name.toUpperCase()} created at $${startPrice}`,
+        balance: users[debugUser]
+    });
+});
+
+app.post('/api/debug/trade', (req, res) => {
+    const { stock, amount, type } = req.body;
+    const debugUser = 'DEBUG_USER';
+    
+    if (!users[debugUser]) users[debugUser] = 100000000;
+    
+    const result = processTrade(debugUser, stock, parseInt(amount), type, 'twitch');
+    
+    if (result.success) {
+        res.json({ 
+            success: true, 
+            message: `${type.toUpperCase()} ${amount} shares of ${stock}`,
+            balance: users[debugUser]
+        });
+    } else {
+        res.json({ success: false, message: result.msg });
+    }
+});
+
+app.post('/api/debug/reset', (req, res) => {
+    const debugUser = 'DEBUG_USER';
+    users[debugUser] = 100000000;
+    
+    // Remove debug user from all shareholders
+    stocks.forEach(stock => {
+        delete stock.shareholders[debugUser];
+    });
+    
+    // Remove stocks created by debug user
+    stocks = stocks.filter(stock => stock.creator !== debugUser);
+    
+    io.emit('update', getData());
+    addLog('DEBUG: Debug account reset');
+    
+    res.json({ success: true, message: 'Debug account reset to $100,000,000' });
+});
+
+app.get('/api/debug/balance', (req, res) => {
+    const debugUser = 'DEBUG_USER';
+    if (!users[debugUser]) users[debugUser] = 100000000;
+    
+    res.json({ balance: users[debugUser] });
+});
+
+app.get('/api/debug/player-balance', (req, res) => {
+    res.json({ balance: playerBalance });
 });
 
 server.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));

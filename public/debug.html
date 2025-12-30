@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Interface - Stock Market</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        .panel.full-width {
+            grid-column: 1 / -1;
+        }
+        
+        h1, h2, h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .balance-info {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 600;
+        }
+        
+        input, select, button {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.reset {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+        }
+        
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .stocks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .stock-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.3s;
+        }
+        
+        .stock-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .stock-card h4 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        
+        .stock-card .price {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #4CAF50;
+            margin: 10px 0;
+        }
+        
+        .stock-card .change {
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .logs {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .log-entry {
+            padding: 8px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        
+        .timestamp {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .message {
+            color: #333;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            display: none;
+            z-index: 1000;
+        }
+        
+        .notification.error {
+            background: #f44336;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 Stock Market Debug Interface</h1>
+    
+    <div class="container">
+        <!-- Balance Panel -->
+        <div class="panel">
+            <h2>💰 Account Balance</h2>
+            <div class="balance-info">
+                <div id="balance">Loading...</div>
+            </div>
+            <button class="reset" onclick="resetAccount()">🔄 Reset Debug Account</button>
+        </div>
+        
+        <!-- Create Stock Panel -->
+        <div class="panel">
+            <h2>📈 Create New Stock</h2>
+            <div class="form-group">
+                <label for="stockName">Stock Name</label>
+                <input type="text" id="stockName" placeholder="e.g., TESLA" value="DEBUG">
+            </div>
+            <div class="form-group">
+                <label for="paramType">Parameter Type</label>
+                <select id="paramType">
+                    <option value="GRAVITY">GRAVITY</option>
+                    <option value="NPC_HEALTH">NPC_HEALTH</option>
+                    <option value="PLAYER_HEALTH">PLAYER_HEALTH</option>
+                    <option value="TRACTION">TRACTION</option>
+                    <option value="ACCELERATION">ACCELERATION</option>
+                    <option value="RAIN">RAIN</option>
+                    <option value="WANTED">WANTED</option>
+                    <option value="ARMOR">ARMOR</option>
+                    <option value="EXPLOSION_FORCE">EXPLOSION_FORCE</option>
+                </select>
+            </div>
+            <button onclick="createStock()">🚀 Create Stock</button>
+        </div>
+        
+        <!-- Trade Panel -->
+        <div class="panel">
+            <h2>📊 Quick Trade</h2>
+            <div class="form-group">
+                <label for="tradeStock">Stock</label>
+                <input id="tradeStock">
+            </div>
+            <div class="form-group">
+                <label for="tradeAmount">Amount</label>
+                <input type="number" id="tradeAmount" value="10" min="1">
+            </div>
+            <div class="button-group">
+                <button onclick="trade('buy')" style="background: linear-gradient(135deg, #4CAF50, #45a049);">↑ Buy</button>
+                <button onclick="trade('sell')" style="background: linear-gradient(135deg, #f44336, #d32f2f);">↓ Sell</button>
+            </div>
+        </div>
+        
+        <!-- Player Balance Panel -->
+        <div class="panel">
+            <h2>🎮 Player Controls</h2>
+            <div class="balance-info" id="playerBalance">
+                Player Balance: Loading...
+            </div>
+            <div class="form-group">
+                <label for="gameMoney">Set Game Money</label>
+                <input type="number" id="gameMoney" value="1000000" min="0">
+            </div>
+            <button onclick="syncGameMoney()">💾 Sync with Game</button>
+        </div>
+        
+        <!-- Available Stocks -->
+        <div class="panel full-width">
+            <h2>📋 Available Stocks</h2>
+            <div id="stocksContainer" class="stocks-grid">
+                <!-- Populated by JavaScript -->
+            </div>
+        </div>
+        
+        <!-- Debug Logs -->
+        <div class="panel full-width">
+            <h2>📝 Debug Logs</h2>
+            <div id="logsContainer" class="logs">
+                <!-- Logs will appear here -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notification -->
+    <div id="notification" class="notification"></div>
+    
+    <script>
+        let socket;
+        let stocks = [];
+        let debugBalance = 100000000;
+        let playerBalance = 0;
+        
+        // Initialize WebSocket connection
+        function init() {
+            socket = io();
+            
+            socket.on('connect', () => {
+                showNotification('Connected to server', 'success');
+                updateBalance();
+                fetchPlayerBalance();
+            });
+            
+            socket.on('update', (data) => {
+                stocks = data.stocks;
+                updateStocksList();
+                updateTradeDropdown();
+            });
+            
+            socket.on('log_update', (logs) => {
+                updateLogs(logs);
+            });
+            
+            socket.on('disconnect', () => {
+                showNotification('Disconnected from server', 'error');
+            });
+            
+            // Fetch initial data
+            fetch('/api/debug/balance')
+                .then(r => r.json())
+                .then(data => {
+                    debugBalance = data.balance;
+                    updateBalance();
+                })
+                .catch(err => {
+                    console.error('Failed to fetch debug balance:', err);
+                    debugBalance = 100000000;
+                    updateBalance();
+                });
+        }
+        
+        // Show notification
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Update balance display
+        function updateBalance() {
+            document.getElementById('balance').textContent = `$${debugBalance.toLocaleString()}`;
+        }
+        
+        // Fetch player balance
+        function fetchPlayerBalance() {
+            fetch('/api/debug/player-balance')
+                .then(r => r.json())
+                .then(data => {
+                    playerBalance = data.balance;
+                    document.getElementById('playerBalance').textContent = 
+                        `Player Balance: $${playerBalance.toLocaleString()}`;
+                });
+        }
+        
+        // Create new stock
+        function createStock() {
+            const name = document.getElementById('stockName').value.toUpperCase();
+            const param = document.getElementById('paramType').value;
+            
+            if (!name || !param) {
+                showNotification('Please fill all fields', 'error');
+                return;
+            }
+            
+            fetch('/api/debug/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, param })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message);
+                    updateBalance();
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(err => {
+                showNotification('Error creating stock', 'error');
+                console.error(err);
+            });
+        }
+        
+        // Execute trade
+        function trade(type) {
+            const stock = document.getElementById('tradeStock').value;
+            const amount = parseInt(document.getElementById('tradeAmount').value);
+            
+            if (!stock || !amount || amount <= 0) {
+                showNotification('Invalid trade parameters', 'error');
+                return;
+            }
+            
+            fetch('/api/debug/trade', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stock, amount, type })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message);
+                    updateBalance();
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(err => {
+                showNotification('Error executing trade', 'error');
+                console.error(err);
+            });
+        }
+        
+        // Reset debug account
+        function resetAccount() {
+            if (confirm('Are you sure you want to reset the debug account? This will reset balance to $100,000,000.')) {
+                fetch('/api/debug/reset', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        showNotification(data.message);
+                        debugBalance = 100000000;
+                        updateBalance();
+                    });
+            }
+        }
+        
+        // Sync game money
+        function syncGameMoney() {
+            const money = parseInt(document.getElementById('gameMoney').value);
+            
+            fetch('/api/game/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ currentMoney: money })
+            })
+            .then(r => r.json())
+            .then(data => {
+                showNotification('Game money synced successfully');
+                fetchPlayerBalance();
+            })
+            .catch(err => {
+                showNotification('Error syncing game money', 'error');
+            });
+        }
+        
+        // Update stocks list
+        function updateStocksList() {
+            const container = document.getElementById('stocksContainer');
+            container.innerHTML = '';
+            
+            stocks.forEach(stock => {
+                const change = stock.history.length > 1 
+                    ? (((stock.value - stock.history[stock.history.length - 2]) / stock.history[stock.history.length - 2]) * 100).toFixed(2)
+                    : '0.00';
+                
+                const card = document.createElement('div');
+                card.className = 'stock-card';
+                card.innerHTML = `
+                    <h4>${stock.name}</h4>
+                    <div class="price">$${stock.value.toFixed(2)}</div>
+                    <div class="change">Change: ${change}%</div>
+                    <div>Param: ${stock.paramType}</div>
+                    <div>Creator: ${stock.creator}</div>
+                    <div>Total Shares: ${Object.values(stock.shareholders).reduce((a, b) => a + b, 0)}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        // Update trade dropdown
+        function updateTradeDropdown() {
+            const dropdown = document.getElementById('tradeStock');
+            dropdown.innerHTML = '<option value="">Select a stock</option>';
+            
+            stocks.forEach(stock => {
+                const option = document.createElement('option');
+                option.value = stock.name;
+                option.textContent = `${stock.name} ($${stock.value.toFixed(2)})`;
+                dropdown.appendChild(option);
+            });
+        }
+        
+        // Update logs
+        function updateLogs(logs) {
+            const container = document.getElementById('logsContainer');
+            container.innerHTML = '';
+            
+            logs.forEach(log => {
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                entry.textContent = log;
+                container.appendChild(entry);
+            });
+        }
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
