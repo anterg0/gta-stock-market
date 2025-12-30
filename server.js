@@ -207,7 +207,117 @@ function getData() {
     return { stocks, leaderboard, playerBalance };
 }
 
+// --- BOT MANAGEMENT API ---
+
+// Endpoint for bots to get their balance
+app.get('/api/bot/balance/:username', (req, res) => {
+    const username = req.params.username;
+    if (!users[username]) {
+        users[username] = STARTING_MONEY;
+    }
+    res.json({ balance: users[username] });
+});
+
+// Endpoint for bots to trade (using real user accounts)
+app.post('/api/bot/trade', (req, res) => {
+    const { username, stockName, amount, type } = req.body;
+    
+    // Validate
+    if (!username || !stockName || !amount || !type) {
+        return res.json({ success: false, msg: "Missing parameters" });
+    }
+    
+    // Initialize user if new
+    if (!users[username]) {
+        users[username] = STARTING_MONEY;
+    }
+    
+    // Process trade as a Twitch user
+    const result = processTrade(username, stockName, parseInt(amount), type, 'twitch');
+    
+    if (result.success) {
+        res.json({ 
+            success: true, 
+            balance: users[username],
+            message: `${type} ${amount} shares of ${stockName}`
+        });
+    } else {
+        res.json({ success: false, message: result.msg });
+    }
+});
+
+// Endpoint for bots to create stocks
+app.post('/api/bot/create', (req, res) => {
+    const { username, name, param } = req.body;
+    
+    // Validate
+    if (!username || !name || !param) {
+        return res.json({ success: false, message: "Missing parameters" });
+    }
+    
+    const stockName = name.toUpperCase();
+    const paramUpper = param.toUpperCase();
+    
+    if (!validParams.includes(paramUpper)) {
+        return res.json({ success: false, message: `Invalid parameter. Valid: ${validParams.join(', ')}` });
+    }
+    
+    if (stocks.find(s => s.name === stockName || s.paramType === paramUpper)) {
+        return res.json({ success: false, message: 'Stock name or parameter already exists' });
+    }
+    
+    // Initialize user if new
+    if (!users[username]) {
+        users[username] = STARTING_MONEY;
+    }
+    
+    const startPrice = Math.floor(Math.random() * (50 - 30 + 1) + 30);
+    
+    if (users[username] < startPrice) {
+        return res.json({ success: false, message: `Insufficient funds. Need $${startPrice}` });
+    }
+    
+    users[username] -= startPrice;
+    
+    const newStock = {
+        id: Date.now(),
+        name: stockName,
+        paramType: paramUpper,
+        value: startPrice,
+        creator: username,
+        history: [startPrice],
+        shareholders: { [username]: 1 },
+        playerShares: 0
+    };
+    
+    stocks.push(newStock);
+    addLog(`BOT IPO: ${stockName} created by ${username} for $${startPrice}`);
+    io.emit('update', getData());
+    
+    res.json({ 
+        success: true, 
+        startPrice: startPrice,
+        balance: users[username],
+        message: `Stock ${stockName} created at $${startPrice}`
+    });
+});
+
 // --- API ---
+app.get('/api/stocks', (req, res) => {
+    res.json({ 
+        stocks: stocks.map(s => ({
+            name: s.name,
+            paramType: s.paramType,
+            value: s.value,
+            creator: s.creator,
+            history: s.history,
+            playerShares: s.playerShares,
+            shareholders: s.shareholders
+        }))
+    });
+});
+
+
 app.post('/api/game/sync', (req, res) => {
     const { currentMoney } = req.body;
     if (currentMoney !== undefined) playerBalance = currentMoney;
